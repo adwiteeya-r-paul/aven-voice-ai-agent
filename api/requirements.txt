@@ -1,0 +1,15 @@
+langchain
+langchain-community
+openai
+groq
+tiktoken
+pinecone-client
+langchain_pinecone
+unstructured
+pdfminer==20191125
+pdfminer.six==20221105
+pillow_heif
+unstructured_inference
+sentence-transformers
+exa-py
+Flask
