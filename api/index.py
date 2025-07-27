@@ -17,7 +17,7 @@ import os
 # initialise flask
 app = Flask(__name__)
 
-# api keys
+# api keys and constants
 EXA_API_KEY = os.getenv('EXA_API')
 PINECONE_API_KEY = os.getenv('PINECONE_API')
 GROQ_API_KEY = os.getenv('GROQ_API')
@@ -26,10 +26,12 @@ VAPI_WEBHOOK_SECRET = os.getenv("VAPI_WEBHOOK_SECRET")
 embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 pc = Pinecone(api_key=os.getenv('PINECONE_API'))
 groq_client = Groq(api_key=os.getenv('GROQ_API'))
+index_name = "aven-agent"
+dimension = 384
+namespace = "aven documents"
 
 #ragfunction
 def ragquery(query : str) -> str:
-    query = "Who is the CEO of Aven?"
     query_embeddings = embeddings.embed_query(text = query)
     top_matches = index.query(vector=query_embeddings, top_k=1, include_metadata=True, namespace=namespace)
     contexts = [item['metadata']['text'] for item in top_matches['matches']]
@@ -92,9 +94,6 @@ def knowledgebase():
 
 
     # initializing Pinecone
-    index_name = "aven-agent"
-    dimension = 384
-    namespace = "aven documents"
     if index_name not in pc.list_indexes().names():
       pc.create_index(
                 name=index_name,
