@@ -47,7 +47,7 @@ def pineconeinit():
 
 
 with app.app_context(): 
-    initialize_pinecone()
+    pineconeinit()
 
 #ragfunction
 def ragquery(query : str) -> str:
@@ -93,7 +93,6 @@ def knowledgebase():
       text_content += line.text + "\n"
 
 
-
     # processing scraped data 
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size = 50,
@@ -124,7 +123,7 @@ def knowledgebase():
 
 
 @app.route('/api/query-aven', methods=['POST'])
-def query_aven_api():
+def query_aven():
     try:
         data = request.json # Get JSON data from the request body
         query = data.get('query') # Extract the 'query' field
@@ -132,10 +131,10 @@ def query_aven_api():
         if not query:
             return jsonify({"error": "No query provided in request body."}), 400
 
-        answer = _perform_rag_query(query)
+        answer = ragquery(query)
         return jsonify({"query": query, "answer": answer}), 200
 
-    except RuntimeError as re: # Catch specific errors from the helper function
+    except RuntimeError as re:
         return jsonify({"status": "error", "message": str(re)}), 500
     except Exception as e:
         print(f"Error in /api/query-aven: {e}")
@@ -163,8 +162,7 @@ def vapi_webhook():
             function_call_data = data.get('functionCall', {})
             function_name = function_call_data.get('name')
             parameters = function_call_data.get('parameters')
-            tool_call_id = function_call_data.get('id') # Used to tell Vapi which tool call this result belongs to.
-
+            tool_call_id = function_call_data.get('id')
             if function_name == 'query_aven_knowledge_base':
                 user_query_from_vapi = parameters.get('query')
 
@@ -179,10 +177,8 @@ def vapi_webhook():
                     }), 400
 
                 print(f"Vapi triggered RAG query with: '{user_query_from_vapi}'")
-                # CORRECTED: Function name from _perform_rag_query to ragquery
                 rag_answer = ragquery(user_query_from_vapi)
 
-                # ADDED: This return statement is crucial for Vapi to receive the tool output
                 return jsonify({
                     "status": "success",
                     "toolCallResults": [{
@@ -195,8 +191,6 @@ def vapi_webhook():
                 print(f"Unknown function call received: {function_name}")
                 return jsonify({"status": "error", "message": "Unknown function call"}), 400
 
-        # Handle other Vapi event types if necessary (e.g., 'call.end', 'speech.update')
-        # For a simple setup, you might just return a success for unhandled types
         return jsonify({"status": "success"}), 200
 
     except Exception as e:
