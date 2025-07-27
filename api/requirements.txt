@@ -3,7 +3,6 @@ langchain
 langchain-community
 langchain_pinecone
 pinecone
-sentence-transformers
 groq
 exa-py
 
