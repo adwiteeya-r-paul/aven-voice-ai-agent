@@ -7,7 +7,6 @@ from langchain_pinecone import PineconeVectorStore
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.schema import Document
 from pinecone import ServerlessSpec
-from sentence_transformers import SentenceTransformer
 from pinecone import Pinecone
 from exa_py import Exa
 from groq import Groq
@@ -101,14 +100,7 @@ def knowledgebase():
     )
     documents = text_splitter.create_documents([text_content])
 
-
-
-    # embedding using HuggingFace Embeddings client
-    embed = []
-    for i,n in enumerate(documents):
-      embed.append(embeddings.embed_query(documents[i].page_content))
-
-
+    
     # inserting data into pinecone
     batch_size = 100
     for i in range(0, len(documents), batch_size):
