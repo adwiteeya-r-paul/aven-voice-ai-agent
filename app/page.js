@@ -1,27 +1,8 @@
 'use client';
 
 import Script from 'next/script';
-import { useEffect, useState } from 'react';
 
 export default function Home() {
-  const [vapiLoaded, setVapiLoaded] = useState(false);
-
-  useEffect(() => {
-    const checkVapi = setInterval(() => {
-      if (typeof window !== 'undefined' && typeof window.Vapi !== 'undefined' && !vapiLoaded) {
-        console.log("Vapi object detected, initializing listen...");
-        window.Vapi.listen({
-          assistantId: "05fc5585-41b3-479e-a6c4-979a824aec23",
-          button: true
-        });
-        setVapiLoaded(true);
-        clearInterval(checkVapi);
-      }
-    }, 200);
-
-    return () => clearInterval(checkVapi);
-  }, [vapiLoaded]);
-
   return (
     <div>
       <main>
@@ -29,13 +10,19 @@ export default function Home() {
         <p style={{ textAlign: 'center' }}>Click the Vapi widget below to start a conversation with Abby.</p>
       </main>
 
+      <vapi-widget
+        assistant-id="05fc5585-41b3-479e-a6c4-979a824aec23"
+        public-key="5aa52943-5448-433d-999f-0dc4e5b7ab5a"
+      ></vapi-widget>
+
       <Script
-        src="https://vapi.ai/widgets/v1/script.js"
+        src="https://unpkg.com/@vapi-ai/client-sdk-react/dist/embed/widget.umd.js"
+        async
         strategy="lazyOnload"
         onLoad={() => {
-          console.log("Vapi Script loaded via onLoad callback.");
+          console.log("Vapi SDK Script loaded successfully from unpkg.");
         }}
-        onError={(e) => console.error("Error loading Vapi script:", e)}
+        onError={(e) => console.error("Error loading Vapi SDK script from unpkg:", e)}
       />
     </div>
   );
