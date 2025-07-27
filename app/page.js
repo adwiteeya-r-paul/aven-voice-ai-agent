@@ -2,9 +2,6 @@
 'use client';
 import Script from 'next/script'; 
 
-export const metadata = {
-  title: 'Abby is here to support you!',
-};
 
 export default function Home() {
   return (
