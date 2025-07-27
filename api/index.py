@@ -32,6 +32,22 @@ namespace = "aven documents"
 index = None
 vectorstore = None
 
+# initializing Pinecone
+def pineconeinit():
+    global index, vectorstore
+    if index_name not in pc.list_indexes().names():
+      pc.create_index(
+                name=index_name,
+                dimension=dimension,
+                metric='cosine',
+                spec= ServerlessSpec(cloud='aws', region='us-east-1'),
+            )
+    index = pc.Index(index_name)
+    vectorstore = PineconeVectorStore(index_name=index_name, embedding=embeddings, pinecone_api_key=os.getenv('PINECONE_API'))
+
+
+with app.app_context(): 
+    initialize_pinecone()
 
 #ragfunction
 def ragquery(query : str) -> str:
@@ -92,22 +108,6 @@ def knowledgebase():
     embed = []
     for i,n in enumerate(documents):
       embed.append(embeddings.embed_query(documents[i].page_content))
-
-
-
-    # initializing Pinecone
-    if index_name not in pc.list_indexes().names():
-      pc.create_index(
-                name=index_name,
-                dimension=dimension,
-                metric='cosine',
-                spec= ServerlessSpec(cloud='aws', region='us-east-1'),
-            )
-    index = pc.Index(index_name)
-    vectorstore = PineconeVectorStore(index_name=index_name, embedding=embeddings, pinecone_api_key=os.getenv('PINECONE_API'))
-
-
-
 
 
     # inserting data into pinecone
