@@ -5,7 +5,6 @@ from langchain.document_loaders import UnstructuredPDFLoader, OnlinePDFLoader, W
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_pinecone import PineconeVectorStore
 from langchain_community.embeddings import HuggingFaceEmbeddings
-from sentence_transformers import SentenceTransformer
 from langchain.schema import Document
 from pinecone import ServerlessSpec
 from pinecone import Pinecone
@@ -100,10 +99,6 @@ def knowledgebase():
         separators = ["\n-","\n\n"]
     )
     documents = text_splitter.create_documents([text_content])
-    
-    embed = []
-    for i,n in enumerate(documents):
-      embed.append(embeddings.embed_query(documents[i].page_content))
     
     # inserting data into pinecone
     batch_size = 100
