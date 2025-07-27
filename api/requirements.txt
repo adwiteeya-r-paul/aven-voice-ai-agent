@@ -2,6 +2,7 @@ Flask
 langchain
 langchain-community
 langchain_pinecone
+sentence_transformers
 pinecone
 groq
 exa-py
