@@ -172,7 +172,7 @@ def vapi_webhook():
                         "status": "error",
                         "toolCallResults": [{
                             "toolCallId": tool_call_id,
-                            "output": {"error": "Missing 'query' parameter for knowledge base tool."}
+                            "output": {"error": "Missing 'query' parameter for'query_aven_knowledge_base' tool."}
                         }]
                     }), 400
 
