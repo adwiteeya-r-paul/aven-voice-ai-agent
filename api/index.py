@@ -29,6 +29,9 @@ groq_client = Groq(api_key=os.getenv('GROQ_API'))
 index_name = "aven-agent"
 dimension = 384
 namespace = "aven documents"
+index = None
+vectorstore = None
+
 
 #ragfunction
 def ragquery(query : str) -> str:
@@ -72,8 +75,7 @@ def knowledgebase():
     text_content = ""
     for line in results.results:
       text_content += line.text + "\n"
-    with open("Aven Support", "w") as f:
-        f.write(text_content)
+
 
 
     # processing scraped data 
@@ -86,7 +88,7 @@ def knowledgebase():
 
 
 
-    # initializing the HuggingFace Embeddings client
+    # embedding using HuggingFace Embeddings client
     embed = []
     for i,n in enumerate(documents):
       embed.append(embeddings.embed_query(documents[i].page_content))
@@ -103,6 +105,7 @@ def knowledgebase():
             )
     index = pc.Index(index_name)
     vectorstore = PineconeVectorStore(index_name=index_name, embedding=embeddings, pinecone_api_key=os.getenv('PINECONE_API'))
+
 
 
 
@@ -139,6 +142,7 @@ def query_aven_api():
         return jsonify({"status": "error", "message": "An internal error occurred."}), 500
 
 
+
 @app.route('/api/vapi-webhook', methods=['POST'])
 def vapi_webhook():
     vapi_signature = request.headers.get('X-Vapi-Signature')
@@ -155,21 +159,16 @@ def vapi_webhook():
         event_type = data.get('type')
         print(f"Received Vapi event type: {event_type}")
 
-
         if event_type == 'function_call':
             function_call_data = data.get('functionCall', {})
             function_name = function_call_data.get('name')
             parameters = function_call_data.get('parameters')
             tool_call_id = function_call_data.get('id') # Used to tell Vapi which tool call this result belongs to.
 
-
             if function_name == 'query_aven_knowledge_base':
-                # Extract the 'query' argument that Vapi sent for your tool.
-                # This 'query' comes from the 'parameters' of the function call.
                 user_query_from_vapi = parameters.get('query')
 
                 if not user_query_from_vapi:
-                    # If Vapi didn't send the expected 'query' parameter
                     print("Error: Vapi function_call for 'query_aven_knowledge_base' missing 'query' parameter.")
                     return jsonify({
                         "status": "error",
@@ -180,6 +179,29 @@ def vapi_webhook():
                     }), 400
 
                 print(f"Vapi triggered RAG query with: '{user_query_from_vapi}'")
+                # CORRECTED: Function name from _perform_rag_query to ragquery
+                rag_answer = ragquery(user_query_from_vapi)
+
+                # ADDED: This return statement is crucial for Vapi to receive the tool output
+                return jsonify({
+                    "status": "success",
+                    "toolCallResults": [{
+                        "toolCallId": tool_call_id,
+                        "output": {"answer": rag_answer}
+                    }]
+                }), 200
+
+            else:
+                print(f"Unknown function call received: {function_name}")
+                return jsonify({"status": "error", "message": "Unknown function call"}), 400
+
+        # Handle other Vapi event types if necessary (e.g., 'call.end', 'speech.update')
+        # For a simple setup, you might just return a success for unhandled types
+        return jsonify({"status": "success"}), 200
+
+    except Exception as e:
+        print(f"Error in Vapi webhook: {e}")
+        return jsonify({"status": "error", "message": "An internal error occurred in Vapi webhook."}), 500
 
 
 
