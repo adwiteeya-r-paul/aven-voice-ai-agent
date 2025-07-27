@@ -1,4 +1,4 @@
-Flask
+flask
 langchain
 langchain-community
 langchain_pinecone
