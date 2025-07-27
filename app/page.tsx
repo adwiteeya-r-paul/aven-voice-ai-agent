@@ -9,22 +9,25 @@ export const metadata = {
 export default function Home() {
   return (
     <div>
-     
       <main>
-        <h1>Welcome to Aven Customer Support!</h1>
-        <p>Click the Vapi widget below to start a conversation with Abby.</p>
+        <h1 style={{ textAlign: 'center' }}>Welcome to Aven Customer Support!</h1>
+        <p style={{ textAlign: 'center' }}>Click the Vapi widget below to start a conversation with Abby.</p>
       </main>
 
-      {/* VAPI WIDGET SCRIPTS */}
-      <Script src="https://vapi.ai/widgets/v1/script.js" strategy="lazyOnload" />
-      <Script strategy="lazyOnload" id="vapi-init-script">
-        {`
-          Vapi.listen({
+      <Script 
+        src="https://vapi.ai/widgets/v1/script.js" 
+        strategy="lazyOnload" 
+        onLoad={() => { 
+          if (typeof Vapi !== 'undefined') { 
+            Vapi.listen({
               assistantId: "05fc5585-41b3-479e-a6c4-979a824aec23",
               button: true
-          });
-        `}
-      </Script>
+            });
+          } else {
+            console.error("Vapi script loaded, but Vapi object not found.");
+          }
+        }}
+      />
     </div>
   );
 }
