@@ -52,7 +52,7 @@ def ragquery(query : str) -> str:
 
 
     augmented_query = "<CONTEXT>\n" + "\n\n-------\n\n".join(contexts[ : 10]) + "\n-------\n</CONTEXT>\n\n\n\nMY QUESTION:\n" + query
-    system_prompt = f"""Your name is AvenVoix. Everytime user asks you something, you will greet the user and say thanks. And then you will respon with the information you have. Keep it casual. Ask if you can help them with anything else. Don't say anything about the context to the user. If you have related information, share that."
+    system_prompt = f"""Your name is Abby. Everytime user asks you something, you will greet the user and say thanks. And then you will respon with the information you have. Keep it casual. Ask if you can help them with anything else. Don't say anything about the context to the user. If you have related information, share that."
     """
     llm_response = groq_client.chat.completions.create(
         model="llama-3.3-70b-versatile",
@@ -82,8 +82,8 @@ def knowledgebase():
 
 
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size = 50,
-        chunk_overlap = 10,
+        chunk_size = 500,
+        chunk_overlap = 50,
         separators = ["\n-","\n\n"]
     )
     documents = text_splitter.create_documents([text_content])
