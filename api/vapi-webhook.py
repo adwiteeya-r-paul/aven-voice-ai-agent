@@ -23,10 +23,17 @@ PINECONE_API_KEY = os.getenv('PINECONE_API')
 GROQ_API_KEY = os.getenv('GROQ_API')
 VAPI_WEBHOOK_SECRET = os.getenv("VAPI_WEBHOOK_SECRET")
 
-exa = Exa(EXA_API_KEY)
-embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-pc = Pinecone(api_key=PINECONE_API_KEY)
-groq_client = Groq(api_key=GROQ_API_KEY)
+# Initialize clients (ensure these are correctly populated from environment variables)
+# IMPORTANT: Ensure sentence-transformers is in your requirements.txt
+try:
+    exa = Exa(EXA_API_KEY)
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    pc = Pinecone(api_key=PINECONE_API_KEY)
+    groq_client = Groq(api_key=GROQ_API_KEY)
+    logger.info("All API clients initialized successfully.")
+except Exception as e:
+    logger.error(f"Failed to initialize one or more API clients: {e}", exc_info=True)
+    # If clients fail to initialize, the app might not work, but we proceed to allow Flask to start.
 
 index_name = "aven-agent"
 dimension = 384
@@ -34,9 +41,14 @@ namespace = "aven documents"
 index = None
 vectorstore = None
 
+# Initializing Pinecone
 def pineconeinit():
     global index, vectorstore
-    logger.info("Initializing Pinecone...")
+    logger.info("Attempting Pinecone initialization...")
+    if not PINECONE_API_KEY:
+        logger.error("PINECONE_API_KEY is not set. Pinecone initialization skipped.")
+        return
+
     try:
         if index_name not in pc.list_indexes().names():
             logger.info(f"Creating Pinecone index: {index_name}")
@@ -47,16 +59,23 @@ def pineconeinit():
                 spec= ServerlessSpec(cloud='aws', region='us-east-1'),
             )
         index = pc.Index(index_name)
+        # Ensure the vectorstore is correctly initialized with the index
         vectorstore = PineconeVectorStore(index=index, embedding=embeddings, text_key="text")
         logger.info(f"Pinecone index '{index_name}' and vectorstore initialized successfully.")
     except Exception as e:
-        logger.error(f"Error initializing Pinecone: {e}")
+        logger.error(f"Error initializing Pinecone: {e}", exc_info=True)
 
+# Run Pinecone initialization within the Flask app context
 with app.app_context():
     pineconeinit()
 
+# RAG function
 def ragquery(query: str) -> str:
     logger.info(f"Starting RAG query for: '{query}'")
+    if index is None or vectorstore is None:
+        logger.error("Pinecone index or vectorstore not initialized. Cannot perform RAG query.")
+        return "I'm sorry, my knowledge base isn't fully set up right now. Please try again later."
+
     try:
         query_embeddings = embeddings.embed_query(text=query)
         logger.info("Query embedded successfully.")
@@ -71,12 +90,16 @@ def ragquery(query: str) -> str:
                 logger.debug(f"Context {i+1}: {context[:100]}...")
         else:
             logger.warning("No relevant contexts found in Pinecone. Attempting web search with Exa.")
-            exa_results = exa.search_and_contents(query, text=True, num_results=3)
-            if exa_results and exa_results.results:
-                contexts = [res.text for res in exa_results.results if res.text]
-                logger.info(f"Retrieved {len(contexts)} contexts from Exa.")
+            # Fallback to Exa if no Pinecone matches
+            if EXA_API_KEY: # Only try Exa if API key is set
+                exa_results = exa.search_and_contents(query, text=True, num_results=3)
+                if exa_results and exa_results.results:
+                    contexts = [res.text for res in exa_results.results if res.text]
+                    logger.info(f"Retrieved {len(contexts)} contexts from Exa.")
+                else:
+                    logger.warning("No results found from Exa search either.")
             else:
-                logger.warning("No results found from Exa search either.")
+                logger.warning("EXA_API_KEY is not set. Skipping Exa search.")
 
         if not contexts:
             logger.info("No context available, returning a generic response.")
@@ -113,6 +136,13 @@ def hello_world_test():
 @app.route("/api/knowledgebase", methods=["POST"])
 def knowledgebase():
     logger.info("Knowledge base update endpoint hit.")
+    if not EXA_API_KEY:
+        logger.error("EXA_API_KEY is not set. Cannot update knowledge base.")
+        return jsonify({"status": "error", "message": "EXA_API_KEY not set. Cannot update knowledge base."}), 500
+    if index is None or vectorstore is None:
+        logger.error("Pinecone index or vectorstore not initialized. Cannot update knowledge base.")
+        return jsonify({"status": "error", "message": "Pinecone not ready. Cannot update knowledge base."}), 500
+
     try:
         results = exa.search_and_contents(
             "Aven Support Articles",
@@ -148,12 +178,8 @@ def knowledgebase():
             metadatas = [{"text": doc.page_content} for doc in batch]
             texts = [doc.page_content for doc in batch]
             
-            if vectorstore:
-                vectorstore.add_texts(texts, metadatas=metadatas, namespace=namespace)
-                logger.info(f"Inserted batch {i//batch_size + 1} into Pinecone.")
-            else:
-                logger.error("Vectorstore not initialized. Cannot add texts to Pinecone.")
-                return jsonify({"status": "error", "message": "Pinecone vectorstore not ready."}), 500
+            vectorstore.add_texts(texts, metadatas=metadatas, namespace=namespace)
+            logger.info(f"Inserted batch {i//batch_size + 1} into Pinecone.")
 
         logger.info("Knowledge base update process completed.")
         return jsonify({"status": "success", "message": "Knowledge base update process initiated."}), 200
@@ -189,8 +215,8 @@ def vapi_webhook():
     vapi_signature = request.headers.get('X-Vapi-Signature')
     
     if not VAPI_WEBHOOK_SECRET:
-        logger.error("VAPI_WEBHOOK_SECRET not set in environment variables.")
-        return jsonify({"status": "error", "message": "Server configuration error"}), 500
+        logger.error("VAPI_WEBHOOK_SECRET is not set in environment variables. Webhook cannot be verified.")
+        return jsonify({"status": "error", "message": "Server configuration error: VAPI_WEBHOOK_SECRET missing."}), 500
 
     if vapi_signature != VAPI_WEBHOOK_SECRET:
         logger.warning(f"Unauthorized Vapi webhook request: Signature mismatch. Received: {vapi_signature}, Expected: {VAPI_WEBHOOK_SECRET}")
@@ -215,11 +241,15 @@ def vapi_webhook():
                 if not user_query_from_vapi:
                     logger.error("Vapi function_call for 'query_aven_knowledge_base' missing 'query' parameter.")
                     return jsonify({
-                        "status": "error",
-                        "toolCallResults": [{
-                            "toolCallId": tool_call_id,
-                            "output": {"error": "Missing 'query' parameter for 'query_aven_knowledge_base' tool."}
-                        }]
+                        "result": {
+                            "messages": [
+                                {
+                                    "role": "assistant",
+                                    "content": "I'm sorry, I didn't receive a clear query for the knowledge base. Can you please rephrase?",
+                                    "type": "speech"
+                                }
+                            ]
+                        }
                     }), 400
 
                 logger.info(f"Vapi triggered RAG query with: '{user_query_from_vapi}'")
@@ -240,7 +270,17 @@ def vapi_webhook():
 
             else:
                 logger.warning(f"Unknown function call received: {function_name}")
-                return jsonify({"status": "error", "message": "Unknown function call"}), 400
+                return jsonify({
+                    "result": {
+                        "messages": [
+                            {
+                                "role": "assistant",
+                                "content": "I'm sorry, I don't know how to handle that request.",
+                                "type": "speech"
+                            }
+                        ]
+                    }
+                }), 400
 
         elif event_type == 'end':
             logger.info("Conversation ended by Vapi.")
